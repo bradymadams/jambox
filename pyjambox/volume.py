@@ -2,17 +2,18 @@ import serial
 import math
 
 COM = '/dev/ttyAMA0'
+BAUD = 9600
 
 #MINVOL = 0
 #MAXVOL = 255
 
-class Volume(object):
+class Knob(object):
     def __init__(self, vol0, minvol=0, maxvol=255):
         self.current = vol0
         self.minvol = minvol
         self.maxvol = maxvol
 
-        self.ser = serial.Serial(COM, 9600)
+        self.ser = serial.Serial(COM, BAUD)
 
         self.set(vol0)
 
