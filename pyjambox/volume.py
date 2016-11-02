@@ -20,7 +20,7 @@ class Knob(object):
 
         self.ser = serial.Serial(COM, BAUD)
 
-        self.set(init)
+        #self.set(init)
 
     def _send_instruction(self, inst):
         inst += '$' # add instruction termination character
