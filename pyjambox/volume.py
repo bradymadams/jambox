@@ -55,28 +55,28 @@ class Knob(object):
         self.set(self.current - n)
 
     def setlog(self, lval):
-        lval = min(lval, 9.0)
+        lval = min(lval, 1.0)
         lval = max(lval, 0.0)
-        lval += 1.0
+        #lval += 1.0
 
-        f = math.log10(lval)
-        i = int( round((self.maxval - self.minval) * f) ) + self.minval
+        f = math.pow(10.0, lval)
+        i = int( round((f - 1.0) * float(self.maxval - self.minval) / 9.0) ) + self.minval
 
         self.set(i)
 
     def tolog(self):
-        f = float((self.current - self.minval)) / float((self.maxval - self.minval))
-        lval = math.pow(10.0, f) - 1.0
+        lval = float(self.current - self.minval) * 9.0 / float(self.maxval - self.minval) + 1.0
+        lval = math.log10(lval)
         return lval
 
-    def uplog(self, n=1.0):
+    def uplog(self, n=0.1):
         self.setlog(self.tolog() + n)
 
-    def downlog(self, n=1.0):
+    def downlog(self, n=0.1):
         self.setlog(self.tolog() - n)
 
     # use log scale to determine how many LEDs should be lit
     def numleds(self):
-        return int( round(NLEDS * self.tolog() / 9.0) )
+        return int( round(NLEDS * self.tolog()) )
         
 
