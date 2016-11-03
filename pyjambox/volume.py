@@ -1,7 +1,8 @@
 import serial
 import math
+import time
 
-COM = '/dev/ttyAMA0'
+COM = '/dev/ttyUSB0'
 BAUD = 9600
 
 MINVAL = 0
@@ -19,6 +20,14 @@ class Knob(object):
         self.maxval = maxval
 
         self.ser = serial.Serial(COM, BAUD)
+
+        # If we're connecting via USB, take a moment to allow
+        # the serial connection to be made and send an instruction
+        # (I believe opening the connection via USB resets the Arduino)
+        if 'USB' in COM:
+            time.sleep(1.0)
+            self._send_instruction('S:0')
+            self._send_instruction('S:0')
 
         #self.set(init)
 
