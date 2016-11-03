@@ -1,11 +1,10 @@
-import pyjambox.volume
-
+import jambox
 import time
 
 dr = 0.01
 delay = 0.1
 
-knob = pyjambox.volume.Knob((0, 1), maxval=61)
+knob = jambox.Knob((0, 1), maxval=61)
 
 r = 0.0
 while r <= 1.0:

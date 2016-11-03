@@ -1,5 +1,4 @@
-import pyjambox.volume
-
+import jambox
 import sys
 
 def help():
@@ -14,7 +13,7 @@ if len(sys.argv) <= 1:
 
 command = sys.argv[1]
 
-knob = pyjambox.volume.Knob((0, 1))
+knob = jambox.Knob((0, 1))
 
 if command == 'set':
     knob.set(int(sys.argv[2]))
