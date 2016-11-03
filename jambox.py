@@ -5,17 +5,21 @@ import time
 COM = '/dev/ttyUSB0'
 BAUD = 9600
 
-MINVAL = 0
-MAXVAL = 255
-NLEDS = 10
+KNOB_MINVAL = 0
+KNOB_MAXVAL = 255
+KNOB_NLEDS = 10
+
+VOLUME_CHANNELS = (0, 1)
+VOLUME_MAX = 255
+VOLUME_MAX_ON = 0.5
 
 class Knob(object):
-    def __init__(self, channels, init=MINVAL, minval=MINVAL, maxval=MAXVAL):
+    def __init__(self, channels, minval=KNOB_MINVAL, maxval=KNOB_MAXVAL):
         self.channels = channels
         if type(self.channels) is int:
             self.channels = (self.channels, )
 
-        self.current = init
+        self.current = 0
         self.minval = minval
         self.maxval = maxval
 
@@ -86,6 +90,32 @@ class Knob(object):
 
     # use log scale to determine how many LEDs should be lit
     def numleds(self):
-        return int( round(NLEDS * self.tolog()) )
-        
+        return int( round(KNOB_NLEDS * self.tolog()) )
+
+
+class ControlPanel(object):
+    MASTERPANEL = None
+
+    def __init__(self):
+        self.knob_vol = Knob(VOLUME_CHANNELS, maxval=VOLUME_MAX)
+
+        self._limit_volume()
+
+    @staticmethod
+    def master():
+        if ControlPanel.MASTERPANEL is None:
+            ControlPanel.MASTERPANEL = ControlPanel()
+        return ControlPanel.MASTERPANEL
+
+    def power_on(self):
+        self._limit_volume()
+
+    def power_off(self):
+        pass
+
+    # This function is used to ensure the volume is not
+    # set too high during various events, e.g. when power is turned on
+    def _limit_volume(self):
+        if self.knob_vol.tolog() > VOLUME_MAX_ON:
+            self.knob.setlog(VOLUME_MAX_ON)
 
