@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import jambox
+import json
 from flask import Flask, render_template
 
 app = Flask(__name__)
@@ -8,12 +9,17 @@ panel = jambox.ControlPanel.master()
 
 @app.route('/')
 def index():
-    return render_template('control_panel.html')
-    #return 'Welcome to the Jambox!'
+    non = panel.knob_vol.numleds()
+    noff = jambox.KNOB_NLEDS - non
+    return render_template('control_panel.html', non=non, noff=noff)
 
 @app.route('/volstat/')
 def volstat():
-    return 'Volume at %f' % panel.knob_vol.tolog()
+    #panel.knob_vol.getstatus()
+    non = panel.knob_vol.numleds()
+    noff = jambox.KNOB_NLEDS - non
+    return json.dumps({'non':non, 'noff':noff})
+    #return 'Volume at %f' % panel.knob_vol.tolog()
 
 @app.route('/volchange/<dv>/')
 def volchange(dv):

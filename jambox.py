@@ -2,7 +2,8 @@ import serial
 import math
 import time
 
-COM = '/dev/ttyUSB0'
+#COM = '/dev/ttyUSB0'
+COM = '/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0'
 BAUD = 9600
 
 KNOB_MINVAL = 0
@@ -23,17 +24,17 @@ class Knob(object):
         self.minval = minval
         self.maxval = maxval
 
-        self.ser = serial.Serial(COM, BAUD)
+        self.ser = serial.Serial(COM, BAUD, timeout=10.0)
 
         # If we're connecting via USB, take a moment to allow
         # the serial connection to be made and send an instruction
         # (I believe opening the connection via USB resets the Arduino)
-        if 'USB' in COM:
+        if 'USB' in COM.upper():
             time.sleep(1.0)
-            self._send_instruction('S:0')
-            self._send_instruction('S:0')
+            self._send_instruction('D:0')
+            self._send_instruction('D:0')
 
-        #self.set(init)
+        self.getstatus()
 
     def _send_instruction(self, inst):
         inst += '$' # add instruction termination character
@@ -53,12 +54,11 @@ class Knob(object):
         sval = 'P:%i' % val
         for c in self.channels:
             sval += ' %i' % c
-        sval += '$'
 
         self._send_instruction(sval)
         self.current = val
 
-        sled = 'L:%i$' % self.numleds()
+        sled = 'L:%i' % self.numleds()
         self._send_instruction(sled)
 
     def up(self, n=1):
@@ -92,6 +92,33 @@ class Knob(object):
     def numleds(self):
         return int( round(KNOB_NLEDS * self.tolog()) )
 
+    def getstatus(self, c=None):
+        if c is None:
+            # just get the status of our first channel
+            c = self.channels[0]
+
+        sstat = 'S:%i' % c
+        self._send_instruction(sstat)
+        n = self.ser.readline()
+
+        # try to convert the returned string to
+        # an int and set it to the current value
+        if n:
+            try:
+                clevel = int(n)
+                self.current = clevel
+            except:
+                print 'Unable to get status'
+
+        return self.current
+
+    def mute(self, on):
+        m = 1 if on else 0
+        self._send_instruction('M:%i' % m)
+
+    def standby(self, on):
+        z = 1 if on else 0
+        self._send_instruction('Z:%i' % z)
 
 class ControlPanel(object):
     MASTERPANEL = None

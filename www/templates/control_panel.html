@@ -5,12 +5,23 @@
 
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
     <script src="static/jambox.js"></script>
+
+    <script type="text/javascript">
+        function initleds() {
+            lightleds({{ non }}, {{ noff }});
+        };
+        window.onload = initleds;
+    </script>
 </head>
 <body>
     <div id="main">
         <h1 id="title">Jambox</h1>
         <div id="volume">
-            <div id="volume_leds"></div>
+            <h2>Volume</h2>
+            <div id="volume_leds">
+                <ul id="volume_leds_list">
+                </ul>
+            </div>    
             <div id="volume_buttons">
                 <a class="button" href="#" onclick="volchange(0.1)">Up</a>
                 <a class="button" href="#" onclick="volchange(-0.1)">Down</a>
