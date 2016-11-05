@@ -15,6 +15,9 @@
   M:N
   This instruction pulls the Mute pin LOW (N=0) or HIGH (N=1)
   
+  Z:N
+  This instruction pulls the Stand By pin LOW (N=0) or HIGH (N=1)
+  
   S:N
   This instruction writes the current value of the N (0-5) pot
 */
@@ -28,17 +31,12 @@ const int potSlaveSelectPin = 10;
 const int openValue = 0;
 const char termCharacter = '$';
 
-/*
-int pot0 = openValue;
-int pot1 = openValue;
-int pot2 = openValue;
-int pot3 = openValue;
-int pot4 = openValue;
-int pot5 = openValue;
-*/
+int pots[] = {openValue, openValue, openValue, openValue, openValue, openValue};
 
 const int nleds = 10;
 const int led_pins[] = {2, 3, 4, 5, 6, 7, 8, 9, 14, 15};
+const int mute_pin = 18;
+const int sdby_pin = 19;
 
 void setup() {
   pinMode(potSlaveSelectPin, OUTPUT);
@@ -54,6 +52,12 @@ void setup() {
     pinMode(led_pins[iled], OUTPUT);
     digitalWrite(led_pins[iled], LOW);
   }
+  
+  pinMode(mute_pin, OUTPUT);
+  digitalWrite(mute_pin, LOW);
+  
+  pinMode(sdby_pin, OUTPUT);
+  digitalWrite(sdby_pin, LOW);
 }
 
 void loop() {  
@@ -104,19 +108,14 @@ void process_instruction(String inst) {
     i1 = i2;
   }
   
-  /*
-  Serial.println(nargs, DEC);
-  for (int i = 0; i < nargs; i++) {
-    Serial.println(inst_a[i], DEC);
-  }
-  */
-  
   if (inst_t == 'P') {
     process_instruction_P(nargs, inst_a);
   } else if (inst_t == 'L') {
     process_instruction_L(nargs, inst_a);
   } else if (inst_t == 'M') {
     process_instruction_M(nargs, inst_a);
+  } else if (inst_t == 'Z') {
+    process_instruction_Z(nargs, inst_a);
   } else if (inst_t == 'S') {
     process_instruction_S(nargs, inst_a);
   }
@@ -126,7 +125,10 @@ void process_instruction(String inst) {
 
 void process_instruction_P(int nargs, int* args) {
   for (int i = 1; i < nargs; i++) {
-    digital_pot_write(args[i], args[0]);
+    if (args[i] <= 5) {
+      digital_pot_write(args[i], args[0]);
+      pots[args[i]] = args[0];
+    }
   }
 }
 
@@ -141,9 +143,30 @@ void process_instruction_L(int nargs, int* args) {
 }
 
 void process_instruction_M(int nargs, int* args) {
+  if (nargs >= 1) {
+      if (args[0] == 0) {
+        digitalWrite(mute_pin, LOW);
+      } else if (args[0] == 1) {
+        digitalWrite(mute_pin, HIGH);
+      }
+  }
+}
+
+void process_instruction_Z(int nargs, int* args) {
+  if (nargs >= 1) {
+      if (args[0] == 0) {
+        digitalWrite(sdby_pin, LOW);
+      } else if (args[0] == 1) {
+        digitalWrite(sdby_pin, HIGH);
+      }
+  }
 }
 
 void process_instruction_S(int nargs, int* args) {
+  if (nargs >= 1) {
+    int stat = pots[args[0]];
+    Serial.println(stat, DEC);
+  }
 }
 
 void digital_pot_write(int channel, int value) {
