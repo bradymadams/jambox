@@ -2,6 +2,9 @@ import serial
 import math
 import time
 
+import threading
+from RPi import GPIO
+
 #COM = '/dev/ttyUSB0'
 COM = '/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0'
 BAUD = 9600
@@ -10,9 +13,62 @@ KNOB_MINVAL = 0
 KNOB_MAXVAL = 255
 KNOB_NLEDS = 10
 
-VOLUME_CHANNELS = (0, 1)
+VOLUME_CHANNELS = (0, )
+#VOLUME_CHANNELS = (0, 1)
 VOLUME_MAX = 255
 VOLUME_MAX_ON = 0.5
+
+VOLUME_RE_PINA = 23
+VOLUME_RE_PINB = 24
+
+class RotaryEnc(object):
+    def __init__(self, knob, pinA, pinB, dvdd=0.01):
+        self.knob = knob
+        self.pinA = pinA
+        self.pinB = pinB
+        self.dvdd = dvdd
+
+        GPIO.setup(self.pinA, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        GPIO.setup(self.pinB, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    def monitor(self):
+        ap = GPIO.input(self.pinA)
+        bp = GPIO.input(self.pinB)
+        dirp = -1 # Assume CCW direction to start
+
+        while True:
+            a = GPIO.input(self.pinA)
+            b = GPIO.input(self.pinB)
+
+            if a ^ b:
+                dir_a_diff = 1
+                dir_b_diff = -1
+            else:
+                dir_a_diff = -1
+                dir_b_diff = 1
+
+            if a != ap or b != bp:
+                if a != ap and b == bp:
+                    dir0 = dir_a_diff
+                    count = 1
+                elif a == ap and b != bp:
+                    dir0 = dir_b_diff
+                    count = 1
+                else:
+                    dir0 = dirp
+                    count = 2
+
+                # To avoid noise only change volume if knob is moving in same direction
+                if dir0 == dirp:
+                    if dir0 == 1:
+                        self.knob.uplog(self.dvdd * count)
+                    else:
+                        self.knob.downlog(self.dvdd * count)
+                
+                ap = a
+                bp = b
+                dirp = dir0
+
 
 class Knob(object):
     def __init__(self, channels, minval=KNOB_MINVAL, maxval=KNOB_MAXVAL):
@@ -124,7 +180,10 @@ class ControlPanel(object):
     MASTERPANEL = None
 
     def __init__(self):
+        GPIO.setmode(GPIO.BCM)
+
         self.knob_vol = Knob(VOLUME_CHANNELS, maxval=VOLUME_MAX)
+        self.knob_vol.rotary_encoder(VOLUME_RE_PINA, VOLUME_RE_PINB)
 
         self._limit_volume()
 
