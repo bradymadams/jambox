@@ -1,6 +1,7 @@
 import serial
 import math
 import time
+import socket
 
 import threading
 from RPi import GPIO
@@ -9,12 +10,14 @@ from RPi import GPIO
 COM = '/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0'
 BAUD = 9600
 
+PORT = 9000
+
 KNOB_MINVAL = 0
 KNOB_MAXVAL = 255
 KNOB_NLEDS = 10
 
-VOLUME_CHANNELS = (0, )
-#VOLUME_CHANNELS = (0, 1)
+#VOLUME_CHANNELS = (0, )
+VOLUME_CHANNELS = (0, 1)
 VOLUME_MAX = 255
 VOLUME_MAX_ON = 0.5
 
@@ -27,6 +30,7 @@ class RotaryEnc(object):
         self.pinA = pinA
         self.pinB = pinB
         self.dvdd = dvdd
+        self.watch = False
 
         GPIO.setup(self.pinA, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.pinB, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -36,7 +40,9 @@ class RotaryEnc(object):
         bp = GPIO.input(self.pinB)
         dirp = -1 # Assume CCW direction to start
 
-        while True:
+        self.watch = True
+
+        while self.watch:
             a = GPIO.input(self.pinA)
             b = GPIO.input(self.pinB)
 
@@ -117,11 +123,14 @@ class Knob(object):
         sled = 'L:%i' % self.numleds()
         self._send_instruction(sled)
 
-    def up(self, n=1):
+    def turn(self, n):
         self.set(self.current + n)
 
+    def up(self, n=1):
+        self.turn(abs(n))
+
     def down(self, n=1):
-        self.set(self.current - n)
+        self.turn(-abs(n))
 
     def setlog(self, lval):
         lval = min(lval, 1.0)
@@ -138,11 +147,14 @@ class Knob(object):
         lval = math.log10(lval)
         return lval
 
-    def uplog(self, n=0.1):
+    def turnlog(self, n):
         self.setlog(self.tolog() + n)
 
+    def uplog(self, n=0.1):
+        self.turnlog(abs(n))
+
     def downlog(self, n=0.1):
-        self.setlog(self.tolog() - n)
+        self.turnlog(-abs(n))
 
     # use log scale to determine how many LEDs should be lit
     def numleds(self):
@@ -180,18 +192,9 @@ class ControlPanel(object):
     MASTERPANEL = None
 
     def __init__(self):
-        GPIO.setmode(GPIO.BCM)
-
         self.knob_vol = Knob(VOLUME_CHANNELS, maxval=VOLUME_MAX)
-        self.knob_vol.rotary_encoder(VOLUME_RE_PINA, VOLUME_RE_PINB)
 
         self._limit_volume()
-
-    @staticmethod
-    def master():
-        if ControlPanel.MASTERPANEL is None:
-            ControlPanel.MASTERPANEL = ControlPanel()
-        return ControlPanel.MASTERPANEL
 
     def power_on(self):
         self._limit_volume()
@@ -204,4 +207,110 @@ class ControlPanel(object):
     def _limit_volume(self):
         if self.knob_vol.tolog() > VOLUME_MAX_ON:
             self.knob.setlog(VOLUME_MAX_ON)
+
+class ControlPanelD(object):
+    CMD_POWER = 'O'
+    CMD_STDBY = 'Z'
+    CMD_SOURC = 'S'
+    CMD_VOLCH = 'V'
+    CMD_MUTE  = 'M'
+
+    def __init__(self, host='127.0.0.1', port=PORT):
+        self.host = host
+        self.port = port
+
+        self.panel = ControlPanel()
+
+    def _exec_cmd(self, data):
+        cmd, args = data.split(':')
+
+        args = args.strip(' ').split(' ')
+
+        if cmd == ControlPanelD.CMD_POWER:
+            return self._exec_cmd_power(args)
+        elif cmd == ControlPanelD.CMD_STDBY:
+            return self._exec_cmd_stdby(args)
+        elif cmd == ControlPanelD.CMD_SOURC:
+            return self._exec_cmd_sourc(args)
+        elif cmd == ControlPanelD.CMD_VOLCH:
+            return self._exec_cmd_volch(args)
+        elif cmd == ControlPanelD.CMD_MUTE:
+            return self._exec_cmd_mute(args)
+        else:
+            print 'Unrecognized command: %s' % cmd
+    
+    def _exec_cmd_power(self, args):
+        print 'CMD power', args
+    
+    def _exec_cmd_stdby(self, args):
+        print 'CMD stdby', args
+    
+    def _exec_cmd_sourc(self, args):
+        print 'CMD sourc', args
+    
+    def _exec_cmd_volch(self, args):
+        self.panel.knob_vol.turnlog(float(args[0]))
+        non = self.panel.knob_vol.numleds()
+        noff = KNOB_NLEDS - non
+        return '%s %s' % (non, noff)
+    
+    def _exec_cmd_mute(self, args):
+        print 'CMD mute', args
+
+    def run(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((self.host, self.port))
+        s.listen(1)
+
+        self.watch = True
+        while self.watch:
+            conn, addr = s.accept()
+
+            data = conn.recv(64).strip(' ')
+            stat = self._exec_cmd(data)
+
+            if stat is None:
+                stat = '0'
+
+            conn.sendall(stat)
+            conn.close()
+
+class ControlPanelC(object):
+    def __init__(self, serv='127.0.0.1', port=PORT):
+        self.serv = serv
+        self.port = port
+
+    def _send_cmd(self, cmd, *args):
+        scmd = cmd + ':'
+
+        if args:
+            for a in args:
+                scmd += ' %s' % str(a)
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((self.serv, self.port))
+        s.sendall(scmd)
+        stat = s.recv(64)
+        s.close()
+
+        return stat
+
+    def send_cmd_power(self):
+        return self._send_cmd(ControlPanelD.CMD_POWER)
+
+    def send_cmd_stdby(self):
+        return self._send_cmd(ControlPanelD.CMD_STDBY)
+
+    def send_cmd_sourc(self, source):
+        return self._send_cmd(ControlPanelD.CMD_SOURC, source)
+
+    def send_cmd_volch(self, dv):
+        return self._send_cmd(ControlPanelD.CMD_VOLCH, dv)
+
+    def send_cmd_mute(self):
+        return self._send_cmd(ControlPanelD.CMD_MUTE)
+
+if __name__ == '__main__':
+    cpd = ControlPanelD()
+    cpd.run()
 

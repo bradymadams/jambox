@@ -1,34 +1,38 @@
 #! /usr/bin/env python
 import jambox
+import os
 import json
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
 
 app = Flask(__name__)
 
-panel = jambox.ControlPanel.master()
+panel = jambox.ControlPanelC()
+
+def numleds():
+    stat = panel.send_cmd_volch('0.0')
+    non, noff = stat.split(' ')
+    return (int(non), int(noff))
 
 @app.route('/')
 def index():
-    non = panel.knob_vol.numleds()
-    noff = jambox.KNOB_NLEDS - non
+    non, noff = numleds()
     return render_template('control_panel.html', non=non, noff=noff)
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+        'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/volstat/')
 def volstat():
-    #panel.knob_vol.getstatus()
-    non = panel.knob_vol.numleds()
-    noff = jambox.KNOB_NLEDS - non
+    non, noff = numleds()
     return json.dumps({'non':non, 'noff':noff})
-    #return 'Volume at %f' % panel.knob_vol.tolog()
 
 @app.route('/volchange/<dv>/')
 def volchange(dv):
-    dv = float(dv)
-    if dv > 0.0:
-        panel.knob_vol.uplog(dv)
-    else:
-        panel.knob_vol.downlog(abs(dv))
-    return volstat()
+    stat = panel.send_cmd_volch(dv)
+    non, noff = stat.split(' ')
+    return json.dumps({'non':int(non), 'noff':int(noff)})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)
