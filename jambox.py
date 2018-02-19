@@ -25,9 +25,34 @@ VOLUME_MAX_ON = 0.5
 VOLUME_RE_PINA = 23
 VOLUME_RE_PINB = 24
 
-class RotaryEnc(object):
+class Input(object):
+    def __init__(self, cb):
+        self.cb = cb # callback function
+
+    def check(self):
+        pass
+
+# Checks a single pin connected to a momentary push button
+class PushButton(Input):
+    def __init__(self, cb, pin):
+        Input.__init__(self, cb)
+        self.pin = pin
+
+        GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+        self.pstate = GPIO.input(self.pin)
+
+    def check(self):
+        state = GPIO.input(self.pin)
+        print state
+        if state == 0 and state != self.pstate:
+            self.cb()
+
+        self.pstate = state
+
+class RotaryEncoder(Input):
     def __init__(self, cb, pinA, pinB, dvdd=0.01):
-        self.cb = cb
+        Input.__init__(self, cb)
         self.pinA = pinA
         self.pinB = pinB
         self.dvdd = dvdd
@@ -36,14 +61,13 @@ class RotaryEnc(object):
         GPIO.setup(self.pinA, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.pinB, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-    def monitor(self):
-        ap = GPIO.input(self.pinA)
-        bp = GPIO.input(self.pinB)
-        dirp = -1 # Assume CCW direction to start
+        self.ap = GPIO.input(self.pinA)
+        self.bp = GPIO.input(self.pinB)
+        self.dirp = -1 # Assume CCW direction to start
 
-        self.watch = True
-
-        while self.watch:
+    def check(self):
+        turning = True
+        while turning:
             a = GPIO.input(self.pinA)
             b = GPIO.input(self.pinB)
 
@@ -54,28 +78,29 @@ class RotaryEnc(object):
                 dir_a_diff = -1
                 dir_b_diff = 1
 
-            if a != ap or b != bp:
-                if a != ap and b == bp:
+            turning = a != self.ap or b != self.bp
+
+            if turning:
+                if a != self.ap and b == self.bp:
                     dir0 = dir_a_diff
                     count = 1
-                elif a == ap and b != bp:
+                elif a == self.ap and b != self.bp:
                     dir0 = dir_b_diff
                     count = 1
                 else:
-                    dir0 = dirp
+                    dir0 = self.dirp
                     count = 2
 
                 # To avoid noise only change volume if knob is moving in same direction
-                if dir0 == dirp:
+                if dir0 == self.dirp:
                     if dir0 == 1:
                         self.cb(self.dvdd * count)
                     else:
                         self.cb(-self.dvdd * count)
                 
-                ap = a
-                bp = b
-                dirp = dir0
-
+                self.ap = a
+                self.bp = b
+                self.dirp = dir0
 
 class Knob(object):
     def __init__(self, channels, minval=KNOB_MINVAL, maxval=KNOB_MAXVAL):
@@ -98,6 +123,9 @@ class Knob(object):
             self._send_instruction('D:0')
 
         self.getstatus()
+
+        self.mute_state = False
+        self.sdby_state = False
 
     def _send_instruction(self, inst):
         inst += '$' # add instruction termination character
@@ -184,12 +212,14 @@ class Knob(object):
 
         return self.current
 
-    def mute(self, on):
-        m = 1 if on else 0
+    def mute(self):
+        self.mute_state = not self.mute_state
+        m = 1 if self.mute_state else 0
         self._send_instruction('M:%i' % m)
 
-    def standby(self, on):
-        z = 1 if on else 0
+    def standby(self):
+        self.sdby_state = not self.sdby_state
+        z = 1 if self.sdby_state else 0
         self._send_instruction('Z:%i' % z)
 
 class ControlPanel(object):

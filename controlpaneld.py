@@ -30,7 +30,7 @@ class ControlPanelD(object):
         print 'CMD power', args
     
     def _exec_cmd_stdby(self, args):
-        print 'CMD stdby', args
+        self.panel.knob_vol.standby()
     
     def _exec_cmd_sourc(self, args):
         print 'CMD sourc', args
@@ -42,7 +42,7 @@ class ControlPanelD(object):
         return '%s %s' % (non, noff)
     
     def _exec_cmd_mute(self, args):
-        print 'CMD mute', args
+        self.panel.knob_vol.mute()
 
     def run(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
